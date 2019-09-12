@@ -21,9 +21,9 @@ def connect_to_db():
 
     client = MongoClient()
 
-    db = client['facebookmarket']
+    db = client['spectrum']
 
-    col = db['marketplace']
+    col = db['scrubbed']
 
     return col
 
@@ -120,10 +120,31 @@ def find_file():
     files = []
     for r, d, f in os.walk(path):
         for file in f:
-            if '.xlsx' in file:
+            if '.csv' in file:
                 files.append(os.path.join(r, file))
     return files[0]
 
+
+
+
+def get_links(links):
+	url_list = []
+	df = pd.DataFrame()
+
+	for link in links:
+		name = link.get_attribute("innerText")
+		url = link.get_attribute("href")
+		url_list.append(url)
+		dict_ = {
+			"name": name,
+			"url": url,
+			}
+		print(dict_)
+		df = df.append(dict_, ignore_index=True)
+	dictData = df.to_dict(orient='records')
+	col = connect_to_db()
+	col.insert_many(dictData)
+	return url_list
 
 
 driver = webdriver.Firefox(executable_path="D:/Sept/Spectrum/env/geckodriver.exe") #CONFIGURE PATH TO DRIVER
@@ -135,15 +156,27 @@ url = 'https://ecorp.azcc.gov/AzAccount?sessionExpired=False'
 driver.get(url)
 time.sleep(15)
 
-business_name_text = driver.find_element_by_xpath("//input[@id='SearchCriteria.quickSearch.BusinessName']")
-business_name_text.click()
-business_name_text.send_keys("HOA")
-
-
-business_name_search = driver.find_element_by_xpath("//button/span[@class='glyphicon glyphicon-search' and 1]")
-business_name_search.click()
-time.sleep(100)
-
+# FILE EXPLORER
 file = find_file()
 print(file)
 
+df = pd.read_csv(file, encoding = "cp1252")
+hoa_series = df['HOA'].tolist()
+
+for hoa in hoa_series:
+    print(hoa)
+
+	# AUTOMATON
+	business_name_text = driver.find_element_by_xpath("//input[@id='SearchCriteria.quickSearch.BusinessName']")
+	business_name_text.click()
+	business_name_text.send_keys(hoa)
+
+
+	business_name_search = driver.find_element_by_xpath("//button/span[@class='glyphicon glyphicon-search' and 1]")
+	business_name_search.click()
+	time.sleep(2)
+
+
+	links = driver.find_elements_by_xpath("//td[2]/a[@class='BlueLink' and 1]")
+
+	dict__list = get_links(links)
